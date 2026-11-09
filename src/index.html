@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0f1e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="NicuInvertor">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/icon.svg">
+<title>NicuInvertor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;500;600&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Layout: one-screen app. Energy-flow hero, then KPI strip, then cards in an auto-fit grid; bottom tab bar on phones, top tabs on wide screens. */
+:root{
+  --bg:#0a0f1e;
+  --surface:rgba(150,170,255,.055);
+  --surface-2:rgba(150,170,255,.09);
+  --line:rgba(160,180,255,.13);
+  --text:#e9edf8;
+  --muted:#8c95b0;
+  --sun:#ffb547;
+  --batt:#38e0c4;
+  --home:#ff7d8f;
+  --grid:#93a0ff;
+  --ok:#52e09a; --warn:#ffcc55; --bad:#ff6b6b;
+  --f-display:"Unbounded", "Segoe UI", system-ui, sans-serif;
+  --f-body:"Manrope", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --r:20px;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{
+  background:var(--bg);color:var(--text);font-family:var(--f-body);font-size:15px;line-height:1.45;
+  -webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums;
+  background-image:
+    radial-gradient(900px 500px at 50% -180px, rgba(255,181,71,.16), transparent 70%),
+    radial-gradient(700px 500px at -10% 110%, rgba(56,224,196,.09), transparent 70%),
+    radial-gradient(600px 400px at 110% 60%, rgba(147,160,255,.08), transparent 70%);
+  background-attachment:fixed;
+}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--sun);outline-offset:2px;border-radius:8px}
+.app{max-width:1180px;margin:0 auto;padding:calc(14px + env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) calc(96px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));display:flex;flex-direction:column;gap:16px}
+header.top{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px;margin-right:auto}
+.brand-mark{width:36px;height:36px;border-radius:12px;background:conic-gradient(from 200deg,var(--sun),#ff8a3d,var(--sun));display:grid;place-items:center;box-shadow:0 0 24px rgba(255,181,71,.35)}
+.brand h1{font-family:var(--f-display);font-weight:500;font-size:18px;margin:0;letter-spacing:.02em}
+.brand small{display:block;color:var(--muted);font-size:12px;margin-top:1px}
+.pill{display:inline-flex;align-items:center;gap:7px;padding:6px 12px;border-radius:999px;background:var(--surface);border:1px solid var(--line);font-size:12.5px;font-weight:600;white-space:nowrap}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.pill.ok .dot{background:var(--ok);box-shadow:0 0 10px var(--ok)}
+.pill.warn .dot{background:var(--warn);box-shadow:0 0 10px var(--warn)}
+.pill.bad .dot{background:var(--bad);box-shadow:0 0 10px var(--bad)}
+.pill.demo .dot{background:var(--grid);box-shadow:0 0 10px var(--grid)}
+nav.tabs{display:flex;gap:6px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:5px}
+nav.tabs button{border:0;background:transparent;padding:8px 14px;border-radius:12px;cursor:pointer;color:var(--muted);font-weight:600;display:flex;align-items:center;gap:7px}
+nav.tabs button[aria-selected="true"]{background:var(--surface-2);color:var(--text)}
+nav.tabs svg{width:18px;height:18px}
+@media (max-width:760px){
+  nav.tabs{position:fixed;left:12px;right:12px;bottom:calc(10px + env(safe-area-inset-bottom));z-index:20;justify-content:space-around;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);background:rgba(16,22,42,.82);padding:6px}
+  nav.tabs button{flex-direction:column;gap:2px;font-size:11px;padding:7px 10px;flex:1}
+}
+.banner{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-radius:14px;background:rgba(147,160,255,.1);border:1px solid rgba(147,160,255,.3);font-size:13.5px}
+.banner[hidden]{display:none}
+.banner b{color:var(--grid)}
+.banner.err{background:rgba(255,107,107,.1);border-color:rgba(255,107,107,.35)}
+.banner.err b{color:var(--bad)}
+.view{display:none;flex-direction:column;gap:16px}
+.view.active{display:flex}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);min-width:0}
+.card h2{font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 14px;display:flex;align-items:center;gap:8px}
+.card h2 .tag{margin-left:auto;text-transform:none;letter-spacing:0;font-weight:600}
+.hero{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:16px}
+@media (max-width:900px){.hero{grid-template-columns:1fr}}
+.flow-card{padding:10px 10px 6px;position:relative;overflow:hidden}
+.flow-card svg{width:100%;height:auto;display:block}
+.flow-meta{position:absolute;left:18px;top:14px;font-size:12px;color:var(--muted)}
+.flow-meta strong{display:block;color:var(--text);font-family:var(--f-display);font-weight:500;font-size:13px}
+.node-val{font-family:var(--f-display);font-weight:500;font-size:17px;fill:var(--text)}
+.node-lbl{font-size:11px;fill:var(--muted);font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+.wire{fill:none;stroke:rgba(160,180,255,.14);stroke-width:3}
+.flowline{fill:none;stroke-width:4;stroke-linecap:round;stroke-dasharray:1 15;animation:flow var(--dur,2s) linear infinite;filter:drop-shadow(0 0 4px currentColor)}
+.flowline.rev{animation-direction:reverse}
+.flowline.off{opacity:0}
+@keyframes flow{to{stroke-dashoffset:-32}}
+@media (prefers-reduced-motion:reduce){.flowline{animation:none;stroke-dasharray:none;stroke-width:2.5;opacity:.7}}
+.side{display:grid;gap:16px;grid-template-rows:auto 1fr}
+.kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px 14px 12px;position:relative;overflow:hidden}
+.kpi::before{content:"";position:absolute;left:0;top:14px;bottom:14px;width:3px;border-radius:3px;background:var(--c,var(--sun))}
+.kpi .lbl{font-size:12px;color:var(--muted);font-weight:600}
+.kpi .val{font-family:var(--f-display);font-size:24px;font-weight:500;margin-top:4px;white-space:nowrap}
+.kpi .val small{font-family:var(--f-body);font-size:13px;color:var(--muted);font-weight:600;margin-left:3px}
+.kpi .sub{font-size:12px;color:var(--muted);margin-top:2px}
+.batt{display:flex;gap:18px;align-items:center}
+.ring{position:relative;width:128px;height:128px;flex:none}
+.ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+.ring .center{position:absolute;inset:0;display:grid;place-items:center;text-align:center}
+.ring .pct{font-family:var(--f-display);font-size:28px;font-weight:500;line-height:1}
+.ring .pct small{font-size:14px}
+.ring .st{font-size:11.5px;color:var(--muted);margin-top:4px;font-weight:600}
+.stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 16px;flex:1;min-width:0}
+.stat .k{font-size:12px;color:var(--muted);font-weight:600}
+.stat .v{font-weight:700;font-size:16px}
+.grid-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+.chart-wrap{position:relative}
+.chart-wrap svg{display:block;width:100%}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);font-weight:600;margin-top:8px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.tip{position:absolute;pointer-events:none;background:rgba(14,20,40,.94);border:1px solid var(--line);border-radius:12px;padding:9px 11px;font-size:12.5px;min-width:150px;box-shadow:0 10px 30px rgba(0,0,0,.4);opacity:0;transition:opacity .12s}
+.tip .t{font-weight:700;margin-bottom:4px}
+.tip div{display:flex;justify-content:space-between;gap:12px}
+.seg{display:inline-flex;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:3px}
+.seg button{border:0;background:transparent;padding:5px 10px;border-radius:9px;color:var(--muted);font-weight:600;cursor:pointer;font-size:12.5px}
+.seg button[aria-pressed="true"]{background:var(--surface-2);color:var(--text)}
+.bar{height:8px;border-radius:8px;background:rgba(160,180,255,.1);overflow:hidden;margin:6px 0 2px}
+.bar > span{display:block;height:100%;border-radius:8px;background:linear-gradient(90deg,#ff8a3d,var(--sun));transition:width .6s ease}
+.rows{display:grid;gap:10px}
+.row{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.row .k{color:var(--muted);font-size:13.5px}
+.row .v{font-weight:700}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:700;background:var(--surface-2)}
+.chip.ok{color:var(--ok)} .chip.warn{color:var(--warn)} .chip.bad{color:var(--bad)}
+.search{width:100%;padding:11px 14px;border-radius:12px;border:1px solid var(--line);background:var(--surface);outline:none}
+.search:focus{border-color:rgba(255,181,71,.5)}
+table.params{width:100%;border-collapse:collapse;font-size:13.5px}
+table.params td{padding:8px 4px;border-bottom:1px solid var(--line)}
+table.params td:last-child{text-align:right;font-weight:700;white-space:nowrap}
+table.params tr:last-child td{border-bottom:0}
+.steps{counter-reset:s;display:grid;gap:12px;margin:0;padding:0;list-style:none}
+.steps li{counter-increment:s;display:grid;grid-template-columns:34px 1fr;gap:12px;align-items:start}
+.steps li::before{content:counter(s);width:30px;height:30px;border-radius:10px;display:grid;place-items:center;background:var(--surface-2);font-family:var(--f-display);font-size:13px;color:var(--sun)}
+.steps b{display:block}
+.steps p{margin:2px 0 0;color:var(--muted);font-size:13.5px;max-width:65ch}
+label.field{display:grid;gap:6px;font-size:13px;color:var(--muted);font-weight:600}
+.input{padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:var(--surface);outline:none;width:100%}
+.btn{border:1px solid var(--line);background:var(--surface-2);padding:10px 16px;border-radius:12px;font-weight:700;cursor:pointer}
+.btn.primary{background:linear-gradient(135deg,var(--sun),#ff8a3d);color:#1a1205;border:0}
+.btn:hover{filter:brightness(1.08)}
+.toggle{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.switch{position:relative;width:44px;height:26px;flex:none}
+.switch input{opacity:0;width:0;height:0}
+.switch span{position:absolute;inset:0;border-radius:99px;background:rgba(160,180,255,.18);transition:.2s;cursor:pointer}
+.switch span::after{content:"";position:absolute;left:3px;top:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:.2s}
+.switch input:checked + span{background:var(--sun)}
+.switch input:checked + span::after{transform:translateX(18px)}
+.lock{position:fixed;inset:0;z-index:50;display:none;place-items:center;background:rgba(6,9,20,.86);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);padding:20px}
+.lock.show{display:grid}
+.lock .card{max-width:360px;width:100%;text-align:center;display:grid;gap:14px}
+.lock input{text-align:center;font-size:22px;letter-spacing:.4em;font-family:var(--f-display)}
+.muted{color:var(--muted)}
+.small{font-size:12.5px}
+.err-text{color:var(--bad);font-size:13px;min-height:18px}
+.updated{font-size:12px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1a1205" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/></svg>
+      </div>
+      <div><h1>NicuInvertor</h1><small id="devName">MPP Solar PIP-MAX 11 kW</small></div>
+    </div>
+    <span class="pill" id="statusPill"><span class="dot"></span><span id="statusText">Se conectează…</span></span>
+    <nav class="tabs" role="tablist" aria-label="Secțiuni">
+      <button role="tab" id="tab-acasa" aria-selected="true" data-view="acasa"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>Acum</button>
+      <button role="tab" id="tab-istoric" aria-selected="false" data-view="istoric"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m7 15 4-5 3 3 5-7"/></svg>Istoric</button>
+      <button role="tab" id="tab-detalii" aria-selected="false" data-view="detalii"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Detalii</button>
+      <button role="tab" id="tab-setari" aria-selected="false" data-view="setari"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Setări</button>
+    </nav>
+  </header>
+
+  <div class="banner" id="banner" hidden></div>
+
+  <!-- ACUM -->
+  <section class="view active" id="view-acasa" role="tabpanel" aria-labelledby="tab-acasa">
+    <div class="hero">
+      <div class="card flow-card" id="flow">
+        <div class="flow-meta"><strong id="modeText">—</strong><span id="updatedText" class="updated">—</span></div>
+        <svg viewBox="0 0 400 330" role="img" aria-label="Fluxul de energie în timp real">
+          <defs>
+            <radialGradient id="gInv" cx="50%" cy="35%" r="70%"><stop offset="0" stop-color="#2a3560"/><stop offset="1" stop-color="#151c36"/></radialGradient>
+            <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="6"/></filter>
+          </defs>
+          <!-- wires -->
+          <path id="w-pv"   class="wire" d="M200 92 V136"/>
+          <path id="w-bat"  class="wire" d="M92 182 H152"/>
+          <path id="w-load" class="wire" d="M248 182 H308"/>
+          <path id="w-grid" class="wire" d="M200 228 V262"/>
+          <path id="f-pv"   class="flowline" style="color:var(--sun);stroke:var(--sun)"   d="M200 92 V136"/>
+          <path id="f-bat"  class="flowline" style="color:var(--batt);stroke:var(--batt)" d="M152 182 H92"/>
+          <path id="f-load" class="flowline" style="color:var(--home);stroke:var(--home)" d="M248 182 H308"/>
+          <path id="f-grid" class="flowline" style="color:var(--grid);stroke:var(--grid)" d="M200 262 V228"/>
+          <!-- inverter -->
+          <rect x="152" y="136" width="96" height="92" rx="22" fill="url(#gInv)" stroke="rgba(160,180,255,.25)"/>
+          <g transform="translate(200 170)" stroke="#cfd6ff" stroke-width="2" fill="none" stroke-linecap="round">
+            <rect x="-15" y="-14" width="30" height="28" rx="6"/>
+            <path d="M-8 4 q4 -9 8 0 t8 0" stroke="var(--sun)"/>
+          </g>
+          <text x="200" y="212" text-anchor="middle" class="node-lbl" style="fill:#cfd6ff">Invertor</text>
+          <!-- solar -->
+          <g id="n-pv" transform="translate(200 52)">
+            <circle r="40" fill="var(--sun)" opacity=".18" filter="url(#glow)" id="pvGlow"/>
+            <circle r="34" fill="#1a1d2e" stroke="var(--sun)" stroke-width="2"/>
+            <g stroke="var(--sun)" stroke-width="2" fill="none" stroke-linecap="round"><circle r="8"/><path d="M0-17v4M0 13v4M-17 0h4M13 0h4M-12-12l3 3M9 9l3 3M-12 12l3-3M9-9l3-3"/></g>
+          </g>
+          <text x="258" y="46" class="node-lbl">Panouri</text>
+          <text x="258" y="68" class="node-val" id="v-pv">—</text>
+          <!-- battery -->
+          <g transform="translate(56 182)">
+            <circle r="34" fill="#16202a" stroke="var(--batt)" stroke-width="2"/>
+            <rect x="-10" y="-15" width="20" height="30" rx="4" fill="none" stroke="var(--batt)" stroke-width="2"/>
+            <rect x="-4" y="-19" width="8" height="4" rx="1.5" fill="var(--batt)"/>
+            <rect id="battFill" x="-6.5" y="-11.5" width="13" height="23" rx="2" fill="var(--batt)" opacity=".85"/>
+          </g>
+          <text x="56" y="240" text-anchor="middle" class="node-lbl">Baterie</text>
+          <text x="56" y="262" text-anchor="middle" class="node-val" id="v-bat">—</text>
+          <text x="56" y="280" text-anchor="middle" class="node-lbl" id="v-batdir" style="text-transform:none;letter-spacing:0">—</text>
+          <!-- home -->
+          <g transform="translate(344 182)">
+            <circle r="34" fill="#25161c" stroke="var(--home)" stroke-width="2"/>
+            <path d="M-14 1 0-12 14 1M-10-2v14h20V-2M-3 12V4h6v8" fill="none" stroke="var(--home)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+          </g>
+          <text x="344" y="240" text-anchor="middle" class="node-lbl">Casă</text>
+          <text x="344" y="262" text-anchor="middle" class="node-val" id="v-load">—</text>
+          <text x="344" y="280" text-anchor="middle" class="node-lbl" id="v-loadpct" style="text-transform:none;letter-spacing:0">—</text>
+          <!-- grid -->
+          <g transform="translate(200 296)">
+            <circle r="30" fill="#181b33" stroke="var(--grid)" stroke-width="2"/>
+            <path d="M-8 14 0-14 8 14M-11-6h22M-9 2h18M-5-6l10 8M5-6-5 2" fill="none" stroke="var(--grid)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </g>
+          <text x="244" y="292" class="node-lbl">Rețea</text>
+          <text x="244" y="313" class="node-val" id="v-grid">—</text>
+        </svg>
+      </div>
+
+      <div class="side">
+        <div class="kpis">
+          <div class="kpi" style="--c:var(--sun)"><div class="lbl">Produs azi</div><div class="val" id="k-prod">—</div><div class="sub" id="k-prod-sub">din panouri</div></div>
+          <div class="kpi" style="--c:var(--home)"><div class="lbl">Consumat azi</div><div class="val" id="k-cons">—</div><div class="sub" id="k-cons-sub">de casă</div></div>
+          <div class="kpi" style="--c:var(--batt)"><div class="lbl">Autonomie</div><div class="val" id="k-auto">—</div><div class="sub" id="k-auto-sub">la consumul actual</div></div>
+          <div class="kpi" style="--c:var(--grid)"><div class="lbl">Din soare</div><div class="val" id="k-self">—</div><div class="sub">din consumul de azi</div></div>
+        </div>
+        <div class="card">
+          <h2>Baterie <span class="tag chip" id="battChip">—</span></h2>
+          <div class="batt">
+            <div class="ring">
+              <svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="50" fill="none" stroke="rgba(160,180,255,.1)" stroke-width="11"/><circle id="ringArc" cx="60" cy="60" r="50" fill="none" stroke="var(--batt)" stroke-width="11" stroke-linecap="round" stroke-dasharray="314.16" stroke-dashoffset="314.16" style="transition:stroke-dashoffset .9s ease, stroke .3s"/></svg>
+              <div class="center"><div><div class="pct" id="socText">—<small>%</small></div><div class="st" id="battState">—</div></div></div>
+            </div>
+            <div class="stats">
+              <div class="stat"><div class="k">Tensiune</div><div class="v" id="b-v">—</div></div>
+              <div class="stat"><div class="k">Curent</div><div class="v" id="b-a">—</div></div>
+              <div class="stat"><div class="k">Putere</div><div class="v" id="b-w">—</div></div>
+              <div class="stat"><div class="k" id="b-eta-k">Estimare</div><div class="v" id="b-eta">—</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="todayCard">
+      <h2>Azi <span class="tag updated" id="todayNote"></span></h2>
+      <div class="chart-wrap" id="chartToday"></div>
+      <div class="legend"><span><i style="background:var(--sun)"></i>Producție</span><span><i style="background:var(--home)"></i>Consum</span><span><i style="background:var(--batt)"></i>Baterie (+ încarcă / − descarcă)</span></div>
+    </div>
+
+    <div class="grid-cards">
+      <div class="card" id="pvCard">
+        <h2>Panouri pe intrări</h2>
+        <div class="rows" id="pvRows"></div>
+      </div>
+      <div class="card" id="outCard">
+        <h2>Ieșire invertor</h2>
+        <div class="rows">
+          <div class="row"><span class="k">Tensiune ieșire</span><span class="v" id="o-v">—</span></div>
+          <div class="row"><span class="k">Frecvență</span><span class="v" id="o-hz">—</span></div>
+          <div class="row"><span class="k">Încărcare invertor</span><span class="v" id="o-pct">—</span></div>
+          <div class="bar"><span id="o-bar" style="width:0%"></span></div>
+          <div class="row"><span class="k">Temperatură</span><span class="v" id="o-temp">—</span></div>
+        </div>
+      </div>
+      <div class="card" id="gridCard">
+        <h2>Rețea electrică <span class="tag chip" id="gridChip">—</span></h2>
+        <div class="rows">
+          <div class="row"><span class="k">Tensiune rețea</span><span class="v" id="g-v">—</span></div>
+          <div class="row"><span class="k">Frecvență rețea</span><span class="v" id="g-hz">—</span></div>
+          <div class="row"><span class="k">Putere din rețea</span><span class="v" id="g-w">—</span></div>
+          <div class="row"><span class="k">Luat din rețea azi</span><span class="v" id="g-today">—</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ISTORIC -->
+  <section class="view" id="view-istoric" role="tabpanel" aria-labelledby="tab-istoric">
+    <div class="card">
+      <h2>Ziua aleasă
+        <span class="tag" style="display:flex;gap:8px;align-items:center">
+          <button class="btn" id="dayPrev" aria-label="Ziua anterioară" style="padding:6px 11px">‹</button>
+          <input type="date" id="dayPick" class="input" style="width:auto;padding:6px 10px">
+          <button class="btn" id="dayNext" aria-label="Ziua următoare" style="padding:6px 11px">›</button>
+        </span>
+      </h2>
+      <div class="chart-wrap" id="chartDay"></div>
+      <div class="legend"><span><i style="background:var(--sun)"></i>Producție</span><span><i style="background:var(--home)"></i>Consum</span><span><i style="background:var(--batt)"></i>Baterie</span></div>
+    </div>
+    <div class="kpis" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
+      <div class="kpi" style="--c:var(--sun)"><div class="lbl">Produs</div><div class="val" id="d-prod">—</div></div>
+      <div class="kpi" style="--c:var(--home)"><div class="lbl">Consumat</div><div class="val" id="d-cons">—</div></div>
+      <div class="kpi" style="--c:var(--sun)"><div class="lbl">Vârf producție</div><div class="val" id="d-peak">—</div><div class="sub" id="d-peak-t"></div></div>
+      <div class="kpi" style="--c:var(--grid)"><div class="lbl">Economie estimată</div><div class="val" id="d-save">—</div><div class="sub" id="d-save-sub">la prețul din Setări</div></div>
+    </div>
+  </section>
+
+  <!-- DETALII -->
+  <section class="view" id="view-detalii" role="tabpanel" aria-labelledby="tab-detalii">
+    <input class="search" id="paramSearch" type="search" placeholder="Caută un parametru (ex: tensiune, PV2, temperatură)" aria-label="Caută parametru">
+    <div class="grid-cards" id="paramGroups"></div>
+  </section>
+
+  <!-- SETARI -->
+  <section class="view" id="view-setari" role="tabpanel" aria-labelledby="tab-setari">
+    <div class="grid-cards">
+      <div class="card">
+        <h2>Sistemul tău</h2>
+        <div class="rows" style="gap:14px">
+          <label class="field" for="setCap">Capacitate baterie (kWh)
+            <input class="input" id="setCap" type="number" min="1" max="200" step="0.1">
+          </label>
+          <label class="field" for="setPrice">Preț energie (lei / kWh)
+            <input class="input" id="setPrice" type="number" min="0" max="10" step="0.01">
+          </label>
+          <label class="field" for="setReserve">Rezervă minimă baterie (%)
+            <input class="input" id="setReserve" type="number" min="0" max="80" step="1">
+          </label>
+          <div class="toggle"><span><b>Date demonstrative</b><br><span class="muted small">Arată aplicația cu valori simulate</span></span>
+            <label class="switch"><input type="checkbox" id="setDemo"><span></span></label></div>
+          <button class="btn" id="logoutBtn">Blochează aplicația (cere PIN din nou)</button>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Conexiune</h2>
+        <div class="rows">
+          <div class="row"><span class="k">Sursă date</span><span class="v" id="c-src">—</span></div>
+          <div class="row"><span class="k">Colector Wi-Fi (PN)</span><span class="v" id="c-pn">—</span></div>
+          <div class="row"><span class="k">Serie invertor</span><span class="v" id="c-sn">—</span></div>
+          <div class="row"><span class="k">Ultima raportare</span><span class="v" id="c-last">—</span></div>
+          <div class="row"><span class="k">Reîmprospătare</span><span class="v">la 30 de secunde</span></div>
+        </div>
+        <p class="muted small" style="margin:14px 0 0">Invertorul trimite date în cloud cam o dată la 5 minute, deci valorile se schimbă în pașii aceștia.</p>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Cum conectezi invertorul</h2>
+      <ol class="steps">
+        <li><div><b>Instalează Energy-Mate pe telefon</b><p>Din App Store sau Google Play. Îți faci cont cu e-mail și parolă. Este aplicația oficială MPP Solar, care înlocuiește WatchPower.</p></div></li>
+        <li><div><b>Adaugă invertorul în aplicație</b><p>Scanezi codul QR sau introduci PN-ul (numărul de 14 caractere) de pe eticheta modulului Wi-Fi al invertorului.</p></div></li>
+        <li><div><b>Conectează-l la Wi-Fi-ul casei</b><p>Aplicația te trece pe rețeaua Wi-Fi emisă de invertor, apoi alegi rețeaua casei și scrii parola. Folosește rețeaua de 2,4 GHz; modulul nu vede 5 GHz.</p></div></li>
+        <li><div><b>Verifică pe dessmonitor.com</b><p>Intră cu același cont pe dessmonitor.com. Dacă vezi invertorul acolo, NicuInvertor poate citi datele.</p></div></li>
+        <li><div><b>Pornește serverul NicuInvertor</b><p>Urmezi ghidul primit împreună cu aplicația: lipești fișierul worker.js în contul tău gratuit Cloudflare și pui contul Energy-Mate și un PIN. Primești o adresă pe care o deschizi de oriunde.</p></div></li>
+      </ol>
+    </div>
+  </section>
+</div>
+
+<div class="lock" id="lock">
+  <form class="card" id="pinForm">
+    <div class="brand-mark" style="margin:0 auto;width:48px;height:48px" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1a1205" stroke-width="2.2" stroke-linecap="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></div>
+    <div><b style="font-family:var(--f-display);font-weight:500;font-size:18px">NicuInvertor e blocat</b><p class="muted small" style="margin:6px 0 0">Scrie PIN-ul pe care l-ai setat în Cloudflare.</p></div>
+    <input class="input" id="pinInput" type="password" inputmode="numeric" autocomplete="current-password" aria-label="PIN" maxlength="32">
+    <div class="err-text" id="pinErr"></div>
+    <button class="btn primary" type="submit">Deblochează</button>
+  </form>
+</div>
+
+<script>
+(() => {
+"use strict";
+/* ---------- utils ---------- */
+const $ = id => document.getElementById(id);
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem("nicuinvertor:"+k); return v === null ? d : JSON.parse(v); }catch(e){ return d; } },
+  set(k, v){ try{ localStorage.setItem("nicuinvertor:"+k, JSON.stringify(v)); }catch(e){} }
+};
+const settings = {
+  cap: store.get("cap", 10), price: store.get("price", 1.3), reserve: store.get("reserve", 20), demo: store.get("demo", false)
+};
+const nf1 = new Intl.NumberFormat("ro-RO",{maximumFractionDigits:1, minimumFractionDigits:1});
+const nf0 = new Intl.NumberFormat("ro-RO",{maximumFractionDigits:0});
+const nf2 = new Intl.NumberFormat("ro-RO",{maximumFractionDigits:2, minimumFractionDigits:2});
+const isNum = v => typeof v === "number" && isFinite(v);
+const fmtW = w => !isNum(w) ? "—" : Math.abs(w) >= 1000 ? nf1.format(w/1000)+" kW" : nf0.format(w)+" W";
+const fmtKwh = k => !isNum(k) ? "—" : (k >= 100 ? nf0.format(k) : nf1.format(k));
+const fmtU = (v, u, f=nf1) => !isNum(v) ? "—" : f.format(v)+" "+u;
+const fmtDur = h => { if(!isNum(h) || h < 0) return "—"; if(h > 99) return "> 99 h"; const H = Math.floor(h), M = Math.round((h-H)*60); return H ? `${H} h ${String(M).padStart(2,"0")}` : `${M} min`; };
+const clamp = (x,a,b) => Math.max(a, Math.min(b, x));
+const pad2 = n => String(n).padStart(2,"0");
+const ymd = d => `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+const hm = d => `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+const setText = (id, t) => { const el = $(id); if(el) el.textContent = t; };
+
+/* ---------- API ---------- */
+let mode = "detect"; // "live" | "demo"
+let pin = store.get("pin", "");
+async function api(path){
+  const r = await fetch(path + (path.includes("?") ? "&" : "?") + "tz=" + new Date().getTimezoneOffset(), {headers: pin ? {"x-pin": pin} : {}, cache:"no-store"});
+  if(r.status === 401){ showLock(true); throw new Error("PIN"); }
+  const j = await r.json().catch(() => ({}));
+  if(!r.ok || j.error) throw new Error(j.error || ("HTTP "+r.status));
+  return j;
+}
+async function detect(){
+  if(settings.demo){ mode = "demo"; return; }
+  try{
+    const r = await fetch("/api/ping", {cache:"no-store"});
+    const j = await r.json();
+    if(!j || j.app !== "nicuinvertor") throw 0;
+    mode = "live";
+    if(!j.configured){ banner("err", "<b>Serverul nu e configurat.</b> Adaugă în Cloudflare variabilele DESS_USER, DESS_PASS și APP_PIN, apoi reîncarcă pagina."); }
+    if(!pin) showLock(true);
+  }catch(e){ mode = "demo"; }
+}
+function banner(kind, html){
+  const b = $("banner");
+  if(!html){ b.hidden = true; return; }
+  b.className = "banner" + (kind === "err" ? " err" : "");
+  b.innerHTML = html; b.hidden = false;
+}
+
+/* ---------- demo data (Bucharest, November, 8 kWp array, 10 kWh battery) ---------- */
+const demo = (() => {
+  let seed = 7;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  function cloud(t){ return .72 + .2*Math.sin(t/2.3) + .08*Math.sin(t*3.1+1); }
+  function pvAt(h){ const rise = 7.15, set = 16.75; if(h <= rise || h >= set) return 0; const x = (h-rise)/(set-rise); return 4700*Math.pow(Math.sin(Math.PI*x),1.5)*cloud(h); }
+  function loadAt(h, k){ let w = 330 + 90*Math.sin(h*1.7); if(h > 6.5 && h < 8.5) w += 900; if(h > 12 && h < 13.5) w += 1200; if(h > 17.5 && h < 22.5) w += 1100 + 400*Math.sin(h*2); if(k % 41 === 7 && h > 7 && h < 22) w += 1800; return w; }
+  function day(date){
+    seed = date.getDate()*131 + date.getMonth()*17 + 7;
+    const now = new Date(); const isToday = ymd(date) === ymd(now);
+    const endH = isToday ? now.getHours() + now.getMinutes()/60 : 24;
+    const capWh = settings.cap*1000; let soc = 58 + 10*rnd();
+    const s = {pv:[], load:[], battery:[], grid:[], soc:[]};
+    const base = new Date(date); base.setHours(0,0,0,0);
+    for(let k = 0, h = 0; h <= endH; k++, h = k*5/60){
+      const t = base.getTime() + k*300000;
+      const pv = Math.max(0, pvAt(h) * (0.9 + 0.2*rnd()));
+      const load = loadAt(h, k) * (0.9 + 0.2*rnd());
+      let bat = pv - load; let grid = 0;
+      if(bat > 0 && soc >= 100) bat = 0;
+      if(bat < 0 && soc <= settings.reserve){ grid = -bat; bat = 0; }
+      soc = clamp(soc + bat*(5/60)/capWh*100, 0, 100);
+      s.pv.push([t, pv]); s.load.push([t, load]); s.battery.push([t, bat]); s.grid.push([t, grid]); s.soc.push([t, soc]);
+    }
+    return s;
+  }
+  function live(){
+    const d = day(new Date()); const L = a => a[a.length-1][1];
+    const pv = L(d.pv), load = L(d.load), bat = L(d.battery), grid = L(d.grid), soc = L(d.soc);
+    const bv = 50.2 + soc*0.05 + (bat > 0 ? 1.2 : -0.4); const ba = bat / bv;
+    const pv1 = pv*0.52, pv2 = pv - pv1;
+    const pv1v = pv1 > 5 ? 352 + rnd()*20 : 18, pv2v = pv2 > 5 ? 348 + rnd()*20 : 15;
+    const out = {
+      ts: Date.now() - 90000, online: true, mode: "Battery Mode", source: "demo",
+      device: {pn:"W0012345678901", sn:"96342207100417", alias:"PIP-MAX 11KW"},
+      pv: {power: pv, strings:[{v:pv1v, a:pv1/pv1v, w:pv1},{v:pv2v, a:pv2/pv2v, w:pv2}]},
+      battery: {soc, voltage: bv, current: ba, power: bat},
+      load: {power: load, percent: load/11000*100},
+      output: {voltage: 230.1, freq: 50.0},
+      grid: {voltage: grid > 0 ? 231.4 : 0, freq: grid > 0 ? 50.0 : 0, power: grid, present: grid > 0},
+      temp: 38 + pv/400,
+    };
+    out.params = [
+      {group:"Rețea", par:"Grid Voltage", val: nf1.format(out.grid.voltage), unit:"V"},
+      {group:"Rețea", par:"Grid Frequency", val: nf2.format(out.grid.freq), unit:"Hz"},
+      {group:"Fotovoltaic", par:"PV1 Input Voltage", val: nf1.format(pv1v), unit:"V"},
+      {group:"Fotovoltaic", par:"PV1 Charging Power", val: nf0.format(pv1), unit:"W"},
+      {group:"Fotovoltaic", par:"PV2 Input Voltage", val: nf1.format(pv2v), unit:"V"},
+      {group:"Fotovoltaic", par:"PV2 Charging Power", val: nf0.format(pv2), unit:"W"},
+      {group:"Baterie", par:"Battery Voltage", val: nf2.format(bv), unit:"V"},
+      {group:"Baterie", par:"Battery Capacity", val: nf0.format(soc), unit:"%"},
+      {group:"Baterie", par:bat >= 0 ? "Battery Charging Current" : "Battery Discharge Current", val: nf1.format(Math.abs(ba)), unit:"A"},
+      {group:"Consum", par:"AC Output Voltage", val: "230,1", unit:"V"},
+      {group:"Consum", par:"AC Output Frequency", val: "50,00", unit:"Hz"},
+      {group:"Consum", par:"AC Output Active Power", val: nf0.format(load), unit:"W"},
+      {group:"Consum", par:"Output Load Percent", val: nf0.format(out.load.percent), unit:"%"},
+      {group:"Sistem", par:"Working State", val: "Battery Mode", unit:""},
+      {group:"Sistem", par:"Inverter Heat Sink Temperature", val: nf0.format(out.temp), unit:"°C"},
+      {group:"Sistem", par:"Main CPU Firmware Version", val: "00062.08", unit:""},
+    ];
+    return out;
+  }
+  return {live, day};
+})();
+
+/* ---------- data load ---------- */
+const getLive = () => mode === "demo" ? Promise.resolve(demo.live()) : api("/api/live");
+const getDay = date => mode === "demo" ? Promise.resolve(demo.day(date)) : api("/api/day?date="+ymd(date));
+
+/* ---------- energy math ---------- */
+function integrate(series, sign = 0){ // Wh -> kWh, trapezoid; sign: 1 only positive, -1 only negative
+  let wh = 0;
+  for(let i = 1; i < (series||[]).length; i++){
+    const [t0, a] = series[i-1], [t1, b] = series[i]; const dt = (t1 - t0)/3600000;
+    if(dt <= 0 || dt > 1) continue;
+    let x = a, y = b; if(sign === 1){ x = Math.max(0,x); y = Math.max(0,y); } else if(sign === -1){ x = Math.min(0,x); y = Math.min(0,y); }
+    wh += (x + y)/2*dt;
+  }
+  return wh/1000;
+}
+
+/* ---------- render: live ---------- */
+const MODES = {"battery mode":"Pe baterie","line mode":"Pe rețea","standby mode":"În așteptare","standby":"În așteptare","fault mode":"Defecțiune","power saving mode":"Economic","power on mode":"Pornire","bypass mode":"Bypass","hybrid mode":"Hibrid"};
+const modeRo = m => { if(!m) return "—"; const k = String(m).toLowerCase().trim(); return MODES[k] || m; };
+function setFlow(id, watts, reverse){
+  const el = $(id); const w = Math.abs(watts||0);
+  if(!isNum(watts) || w < 15){ el.classList.add("off"); return; }
+  el.classList.remove("off"); el.classList.toggle("rev", !!reverse);
+  el.style.setProperty("--dur", clamp(2.6 - Math.log10(w)*0.55, .45, 2.6).toFixed(2)+"s");
+}
+let lastLive = null, todaySeries = null;
+function renderLive(d){
+  lastLive = d;
+  const age = (Date.now() - (d.ts||Date.now()))/60000;
+  const pill = $("statusPill");
+  if(mode === "demo"){ pill.className = "pill demo"; setText("statusText","Date demonstrative"); }
+  else if(!d.online || age > 20){ pill.className = "pill bad"; setText("statusText","Invertor offline"); }
+  else if(age > 8){ pill.className = "pill warn"; setText("statusText","Date întârziate"); }
+  else { pill.className = "pill ok"; setText("statusText","Conectat"); }
+  setText("modeText", modeRo(d.mode));
+  setText("updatedText", d.ts ? "Actualizat la "+hm(new Date(d.ts)) : "—");
+  if(d.device){ setText("devName", (d.device.alias && d.device.alias !== d.device.sn ? d.device.alias : "MPP Solar PIP-MAX 11 kW")); setText("c-pn", d.device.pn || "—"); setText("c-sn", d.device.sn || "—"); }
+  setText("c-src", mode === "demo" ? "Simulare" : "Cloud DessMonitor");
+  setText("c-last", d.ts ? new Date(d.ts).toLocaleString("ro-RO") : "—");
+
+  const pv = d.pv?.power, load = d.load?.power, bat = d.battery?.power, grid = d.grid?.power, soc = d.battery?.soc;
+  setText("v-pv", fmtW(pv)); setText("v-load", fmtW(load)); setText("v-grid", d.grid?.present === false && !(grid > 15) ? "absentă" : fmtW(grid));
+  setText("v-bat", isNum(soc) ? nf0.format(soc)+" %" : "—");
+  setText("v-batdir", !isNum(bat) ? "—" : Math.abs(bat) < 15 ? "în repaus" : (bat > 0 ? "+ " : "− ")+fmtW(Math.abs(bat)));
+  setText("v-loadpct", isNum(d.load?.percent) ? nf0.format(d.load.percent)+" % din invertor" : "");
+  $("pvGlow").setAttribute("opacity", (0.05 + clamp((pv||0)/6000, 0, 1)*0.35).toFixed(2));
+  setFlow("f-pv", pv, false); setFlow("f-load", load, false); setFlow("f-grid", grid, false);
+  setFlow("f-bat", bat, isNum(bat) && bat < 0);
+  const fill = $("battFill"); const fh = 23*clamp((soc||0)/100, 0, 1); fill.setAttribute("height", fh.toFixed(1)); fill.setAttribute("y", (11.5 - fh).toFixed(1));
+
+  // battery card
+  const arc = $("ringArc"); arc.style.strokeDashoffset = (314.16*(1 - clamp((soc||0)/100,0,1))).toFixed(1);
+  const socCol = !isNum(soc) ? "var(--muted)" : soc <= settings.reserve ? "var(--bad)" : soc < 40 ? "var(--warn)" : "var(--batt)";
+  arc.style.stroke = socCol;
+  $("socText").firstChild.nodeValue = isNum(soc) ? nf0.format(soc) : "—";
+  const charging = isNum(bat) && bat > 15, discharging = isNum(bat) && bat < -15;
+  setText("battState", charging ? "se încarcă" : discharging ? "se descarcă" : "în repaus");
+  const chip = $("battChip");
+  chip.className = "tag chip " + (!isNum(soc) ? "" : soc <= settings.reserve ? "bad" : soc < 40 ? "warn" : "ok");
+  chip.textContent = !isNum(soc) ? "—" : soc <= settings.reserve ? "Nivel scăzut" : soc < 40 ? "Moderat" : "Bun";
+  setText("b-v", fmtU(d.battery?.voltage, "V", nf2)); setText("b-a", isNum(d.battery?.current) ? nf1.format(d.battery.current)+" A" : "—"); setText("b-w", fmtW(bat));
+  const capWh = settings.cap*1000;
+  if(charging && isNum(soc)){ setText("b-eta-k","Plină în"); setText("b-eta", fmtDur((100-soc)/100*capWh / bat)); }
+  else if(discharging && isNum(soc)){ setText("b-eta-k","Ajunge la rezervă în"); setText("b-eta", fmtDur(Math.max(0, soc - settings.reserve)/100*capWh / -bat)); }
+  else { setText("b-eta-k","Estimare"); setText("b-eta","—"); }
+  const autoH = isNum(soc) && load > 30 ? Math.max(0, soc - settings.reserve)/100*capWh / load : NaN;
+  $("k-auto").innerHTML = ""; $("k-auto").append(fmtDur(autoH));
+  setText("k-auto-sub", isNum(load) ? "la "+fmtW(load)+", până la "+settings.reserve+" %" : "la consumul actual");
+
+  // pv strings
+  const rows = $("pvRows"); rows.innerHTML = "";
+  const strs = d.pv?.strings || [];
+  const perMppt = 5500;
+  if(!strs.length){ rows.innerHTML = '<p class="muted small" style="margin:0">Invertorul nu raportează intrările separat.</p>'; }
+  strs.forEach((s, i) => {
+    const wrap = document.createElement("div");
+    const r1 = document.createElement("div"); r1.className = "row";
+    const k = document.createElement("span"); k.className = "k"; k.textContent = "Intrarea PV"+(i+1);
+    const v = document.createElement("span"); v.className = "v"; v.textContent = fmtW(s.w);
+    r1.append(k, v);
+    const bar = document.createElement("div"); bar.className = "bar"; const sp = document.createElement("span"); sp.style.width = clamp((s.w||0)/perMppt*100,0,100).toFixed(1)+"%"; bar.append(sp);
+    const sub = document.createElement("div"); sub.className = "muted small"; sub.textContent = `${fmtU(s.v,"V")} · ${fmtU(s.a,"A")} · din ${fmtW(perMppt)} pe intrare`;
+    wrap.append(r1, bar, sub); rows.append(wrap);
+  });
+  // output
+  setText("o-v", fmtU(d.output?.voltage, "V")); setText("o-hz", fmtU(d.output?.freq, "Hz", nf2));
+  setText("o-pct", isNum(d.load?.percent) ? nf0.format(d.load.percent)+" %" : "—");
+  $("o-bar").style.width = clamp(d.load?.percent||0, 0, 100)+"%";
+  setText("o-temp", fmtU(d.temp, "°C", nf0));
+  // grid
+  const gp = d.grid?.present ?? (d.grid?.voltage > 150);
+  const gc = $("gridChip"); gc.className = "tag chip " + (gp ? "ok" : ""); gc.textContent = gp ? "Prezentă" : "Absentă";
+  setText("g-v", fmtU(d.grid?.voltage, "V")); setText("g-hz", fmtU(d.grid?.freq, "Hz", nf2)); setText("g-w", fmtW(grid));
+  renderParams();
+}
+
+function renderKpis(s){
+  if(!s) return;
+  const prod = integrate(s.pv), cons = integrate(s.load), fromGrid = integrate(s.grid||[], 1);
+  $("k-prod").innerHTML = ""; $("k-prod").append(fmtKwh(prod)); const u1 = document.createElement("small"); u1.textContent = "kWh"; $("k-prod").append(u1);
+  $("k-cons").innerHTML = ""; $("k-cons").append(fmtKwh(cons)); const u2 = document.createElement("small"); u2.textContent = "kWh"; $("k-cons").append(u2);
+  const self = cons > 0 ? clamp((cons - fromGrid)/cons*100, 0, 100) : NaN;
+  $("k-self").innerHTML = ""; $("k-self").append(isNum(self) ? nf0.format(self) : "—"); const u3 = document.createElement("small"); u3.textContent = "%"; $("k-self").append(u3);
+  setText("g-today", s.grid ? fmtKwh(fromGrid)+" kWh" : "—");
+  setText("k-prod-sub", "≈ "+nf2.format(prod*settings.price)+" lei economisiți");
+}
+
+/* ---------- chart ---------- */
+function drawChart(host, s, day){
+  host.innerHTML = "";
+  const W = Math.max(280, host.clientWidth), H = Math.round(clamp(W*0.38, 190, 300));
+  const m = {l:42, r:10, t:10, b:24};
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg"); svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.setAttribute("role","img"); svg.setAttribute("aria-label","Grafic putere pe parcursul zilei");
+  const el = (n, a, p = svg) => { const e = document.createElementNS(ns, n); for(const k in a) e.setAttribute(k, a[k]); p.append(e); return e; };
+  const d0 = new Date(day); d0.setHours(0,0,0,0); const t0 = d0.getTime(), t1 = t0 + 864e5;
+  const all = [...(s.pv||[]), ...(s.load||[]), ...(s.battery||[])].map(p => p[1]).filter(isNum);
+  if(!all.length){ host.innerHTML = '<p class="muted" style="margin:30px 0;text-align:center">Nu există date pentru ziua aceasta.</p>'; return; }
+  let ymax = Math.max(1000, ...all), ymin = Math.min(0, ...all);
+  const step = ymax - ymin > 6000 ? 2000 : 1000; ymax = Math.ceil(ymax/step)*step; ymin = Math.floor(ymin/step)*step;
+  const X = t => m.l + (t - t0)/(t1 - t0)*(W - m.l - m.r);
+  const Y = v => m.t + (ymax - v)/(ymax - ymin)*(H - m.t - m.b);
+  const defs = el("defs", {});
+  const g = el("linearGradient", {id:"gpv"+host.id, x1:0, y1:0, x2:0, y2:1}, defs);
+  el("stop", {offset:0, "stop-color":"#ffb547", "stop-opacity":.55}, g); el("stop", {offset:1, "stop-color":"#ffb547", "stop-opacity":0}, g);
+  for(let v = ymin; v <= ymax; v += step){
+    el("line", {x1:m.l, x2:W-m.r, y1:Y(v), y2:Y(v), stroke: v === 0 ? "rgba(160,180,255,.28)" : "rgba(160,180,255,.09)"});
+    const tx = el("text", {x:m.l-8, y:Y(v)+4, "text-anchor":"end", fill:"#8c95b0", "font-size":11}); tx.textContent = (v/1000)+" kW";
+  }
+  for(let h = 0; h <= 24; h += (W < 500 ? 6 : 3)){
+    const tx = el("text", {x:X(t0+h*36e5), y:H-6, "text-anchor": h === 0 ? "start" : h === 24 ? "end" : "middle", fill:"#8c95b0", "font-size":11}); tx.textContent = pad2(h)+":00";
+  }
+  const path = (pts) => pts.filter(p => isNum(p[1])).map((p,i) => (i ? "L" : "M")+X(p[0]).toFixed(1)+" "+Y(p[1]).toFixed(1)).join("");
+  if(s.pv?.length){
+    const pv = s.pv.filter(p => isNum(p[1]));
+    el("path", {d: path(pv)+`L${X(pv[pv.length-1][0]).toFixed(1)} ${Y(0)}L${X(pv[0][0]).toFixed(1)} ${Y(0)}Z`, fill:`url(#gpv${host.id})`});
+    el("path", {d: path(pv), fill:"none", stroke:"#ffb547", "stroke-width":2, "stroke-linejoin":"round"});
+  }
+  if(s.battery?.length) el("path", {d: path(s.battery), fill:"none", stroke:"#38e0c4", "stroke-width":1.6, opacity:.9, "stroke-linejoin":"round"});
+  if(s.load?.length) el("path", {d: path(s.load), fill:"none", stroke:"#ff7d8f", "stroke-width":2, "stroke-linejoin":"round"});
+  const last = s.pv?.[s.pv.length-1];
+  if(last && ymd(new Date(day)) === ymd(new Date())){ el("circle", {cx:X(last[0]), cy:Y(last[1]), r:4.5, fill:"#ffb547", stroke:"#0a0f1e", "stroke-width":2}); }
+  const cursor = el("line", {y1:m.t, y2:H-m.b, stroke:"rgba(233,237,248,.35)", "stroke-dasharray":"3 3", opacity:0});
+  host.append(svg);
+  const tip = document.createElement("div"); tip.className = "tip"; host.append(tip);
+  const near = (arr, t) => { if(!arr?.length) return null; let lo = 0, hi = arr.length-1; while(hi - lo > 1){ const mid = (lo+hi)>>1; if(arr[mid][0] < t) lo = mid; else hi = mid; } const p = Math.abs(arr[lo][0]-t) < Math.abs(arr[hi][0]-t) ? arr[lo] : arr[hi]; return Math.abs(p[0]-t) < 36e5 ? p : null; };
+  const move = ev => {
+    const rect = svg.getBoundingClientRect(); const x = (ev.clientX - rect.left)/rect.width*W;
+    const t = t0 + (x - m.l)/(W - m.l - m.r)*(t1 - t0);
+    const p = near(s.pv, t) || near(s.load, t); if(!p){ tip.style.opacity = 0; cursor.setAttribute("opacity",0); return; }
+    cursor.setAttribute("x1", X(p[0])); cursor.setAttribute("x2", X(p[0])); cursor.setAttribute("opacity", 1);
+    tip.innerHTML = "";
+    const tt = document.createElement("div"); tt.className = "t"; tt.textContent = hm(new Date(p[0])); tip.append(tt);
+    [["Producție", near(s.pv,t), "#ffb547"], ["Consum", near(s.load,t), "#ff7d8f"], ["Baterie", near(s.battery,t), "#38e0c4"]].forEach(([n, q, c]) => {
+      if(!q) return; const r = document.createElement("div"); const a = document.createElement("span"); a.textContent = n; a.style.color = c; const b = document.createElement("b"); b.textContent = fmtW(q[1]); r.append(a, b); tip.append(r);
+    });
+    tip.style.opacity = 1;
+    const px = (X(p[0])/W)*rect.width; const tw = tip.offsetWidth;
+    tip.style.left = clamp(px + 12 > rect.width - tw ? px - tw - 12 : px + 12, 0, rect.width - tw)+"px"; tip.style.top = "8px";
+  };
+  svg.addEventListener("pointermove", move); svg.addEventListener("pointerdown", move);
+  svg.addEventListener("pointerleave", () => { tip.style.opacity = 0; cursor.setAttribute("opacity",0); });
+}
+
+/* ---------- params ---------- */
+function renderParams(){
+  const host = $("paramGroups"); const q = $("paramSearch").value.trim().toLowerCase();
+  const list = (lastLive?.params || []).filter(p => !q || (p.par+" "+p.group).toLowerCase().includes(q));
+  host.innerHTML = "";
+  const groups = {}; list.forEach(p => (groups[p.group || "Altele"] ||= []).push(p));
+  if(!list.length){ host.innerHTML = '<p class="muted">Niciun parametru găsit.</p>'; return; }
+  Object.entries(groups).forEach(([g, items]) => {
+    const card = document.createElement("div"); card.className = "card";
+    const h = document.createElement("h2"); h.textContent = g; card.append(h);
+    const t = document.createElement("table"); t.className = "params";
+    items.forEach(p => { const tr = document.createElement("tr"); const a = document.createElement("td"); a.textContent = p.par; const b = document.createElement("td"); b.textContent = (p.val ?? "—") + (p.unit ? " "+p.unit : ""); tr.append(a, b); t.append(tr); });
+    card.append(t); host.append(card);
+  });
+}
+
+/* ---------- history view ---------- */
+let histDate = new Date();
+async function loadHistory(){
+  $("dayPick").value = ymd(histDate); $("dayPick").max = ymd(new Date());
+  $("dayNext").disabled = ymd(histDate) >= ymd(new Date());
+  try{
+    const s = await getDay(histDate);
+    drawChart($("chartDay"), s, histDate); histSeries = s;
+    const prod = integrate(s.pv), cons = integrate(s.load);
+    setText("d-prod", fmtKwh(prod)+" kWh"); setText("d-cons", fmtKwh(cons)+" kWh");
+    const pk = (s.pv||[]).reduce((a, p) => p[1] > (a?.[1] ?? -1) ? p : a, null);
+    setText("d-peak", pk ? fmtW(pk[1]) : "—"); setText("d-peak-t", pk ? "la "+hm(new Date(pk[0])) : "");
+    setText("d-save", nf2.format(prod*settings.price)+" lei"); setText("d-save-sub", "la "+nf2.format(settings.price)+" lei/kWh");
+  }catch(e){ if(e.message !== "PIN") $("chartDay").innerHTML = '<p class="muted" style="text-align:center;margin:30px 0">Nu am putut încărca ziua: '+String(e.message).replace(/[<>&]/g,"")+'</p>'; }
+}
+let histSeries = null;
+
+/* ---------- loops ---------- */
+async function refreshLive(){
+  try{ const d = await getLive(); renderLive(d); if(mode === "live") banner(null); }
+  catch(e){ if(e.message !== "PIN"){ $("statusPill").className = "pill bad"; setText("statusText","Fără date"); banner("err", "<b>Nu primesc date.</b> "+String(e.message).replace(/[<>&]/g,"")); } }
+}
+async function refreshToday(){
+  try{ const s = await getDay(new Date()); todaySeries = s; renderKpis(s); drawChart($("chartToday"), s, new Date()); setText("todayNote", mode === "demo" ? "simulare" : "din 5 în 5 minute"); }
+  catch(e){ if(e.message !== "PIN") $("chartToday").innerHTML = '<p class="muted" style="text-align:center;margin:30px 0">Graficul zilei nu e disponibil încă.</p>'; }
+}
+
+/* ---------- tabs ---------- */
+function showView(v){
+  document.querySelectorAll("nav.tabs button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.view === v)));
+  document.querySelectorAll(".view").forEach(s => s.classList.toggle("active", s.id === "view-"+v));
+  if(v === "istoric") loadHistory();
+  if(v === "acasa" && todaySeries) drawChart($("chartToday"), todaySeries, new Date());
+  try{ if(location.hash !== "#"+v) history.replaceState(null, "", "#"+v); }catch(e){}
+}
+document.querySelectorAll("nav.tabs button").forEach(b => b.addEventListener("click", () => showView(b.dataset.view)));
+
+/* ---------- lock ---------- */
+function showLock(on){ $("lock").classList.toggle("show", on); if(on) setTimeout(() => $("pinInput").focus(), 50); }
+$("pinForm").addEventListener("submit", async e => {
+  e.preventDefault(); pin = $("pinInput").value.trim(); $("pinErr").textContent = "";
+  try{ const r = await fetch("/api/auth", {headers:{"x-pin":pin}, cache:"no-store"}); if(r.status === 401) throw 0; store.set("pin", pin); showLock(false); start(); }
+  catch(_){ $("pinErr").textContent = "PIN greșit. Încearcă din nou."; }
+});
+$("logoutBtn").addEventListener("click", () => { store.set("pin",""); pin = ""; if(mode === "live") showLock(true); });
+
+/* ---------- settings ---------- */
+$("setCap").value = settings.cap; $("setPrice").value = settings.price; $("setReserve").value = settings.reserve; $("setDemo").checked = settings.demo;
+const onSet = () => {
+  settings.cap = clamp(parseFloat($("setCap").value)||10, 1, 200); settings.price = clamp(parseFloat($("setPrice").value)||0, 0, 10); settings.reserve = clamp(parseFloat($("setReserve").value)||0, 0, 80);
+  store.set("cap", settings.cap); store.set("price", settings.price); store.set("reserve", settings.reserve);
+  if(lastLive) renderLive(lastLive); if(todaySeries) renderKpis(todaySeries);
+};
+["setCap","setPrice","setReserve"].forEach(id => $(id).addEventListener("change", onSet));
+$("setDemo").addEventListener("change", async () => { settings.demo = $("setDemo").checked; store.set("demo", settings.demo); await detect(); start(); });
+$("paramSearch").addEventListener("input", renderParams);
+$("dayPick").addEventListener("change", () => { const v = $("dayPick").value; if(v){ const [y,mo,da] = v.split("-").map(Number); histDate = new Date(y, mo-1, da); loadHistory(); } });
+$("dayPrev").addEventListener("click", () => { histDate = new Date(histDate.getTime() - 864e5); loadHistory(); });
+$("dayNext").addEventListener("click", () => { histDate = new Date(histDate.getTime() + 864e5); loadHistory(); });
+let rT; window.addEventListener("resize", () => { clearTimeout(rT); rT = setTimeout(() => { if(todaySeries) drawChart($("chartToday"), todaySeries, new Date()); if(histSeries && $("view-istoric").classList.contains("active")) drawChart($("chartDay"), histSeries, histDate); }, 150); });
+
+/* ---------- start ---------- */
+let timers = [];
+function start(){
+  timers.forEach(clearInterval); timers = [];
+  if(mode === "demo") banner("demo", "<b>Mod demonstrativ.</b> Valorile sunt simulate. După ce pornești serverul NicuInvertor în Cloudflare, aplicația arată automat datele reale ale invertorului.");
+  else banner(null);
+  refreshLive(); refreshToday();
+  timers.push(setInterval(refreshLive, 30000), setInterval(refreshToday, 300000));
+}
+(async () => {
+  await detect();
+  const h = (location.hash || "").slice(1); if(["istoric","detalii","setari"].includes(h)) showView(h);
+  if(mode === "live" && !pin) return; // wait for PIN
+  start();
+})();
+document.addEventListener("visibilitychange", () => { if(!document.hidden && (mode === "demo" || pin)) refreshLive(); });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+name = "nicuinvertor"
+main = "worker.js"
+compatibility_date = "2025-09-01"
+
+# Secretele (DESS_USER, DESS_PASS, APP_PIN) se setează în Cloudflare,
+# la Settings → Variables and Secrets. Nu le pune aici.
